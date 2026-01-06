@@ -82,10 +82,37 @@ export interface PostListResponse {
   totalPages: number;
 }
 
+// 이미지 스타일 타입
+export type ImageStyle = 'realistic' | 'illustration' | 'minimal' | '3d' | 'watercolor';
+
+export const IMAGE_STYLES: { id: ImageStyle; name: string }[] = [
+  { id: 'realistic', name: '사실적' },
+  { id: 'illustration', name: '일러스트' },
+  { id: 'minimal', name: '미니멀' },
+  { id: '3d', name: '3D' },
+  { id: 'watercolor', name: '수채화' },
+];
+
+// 이미지 분위기 타입
+export type ImageMood = 'professional' | 'friendly' | 'creative' | 'luxurious' | 'bright';
+
+export const IMAGE_MOODS: { id: ImageMood; name: string }[] = [
+  { id: 'professional', name: '전문적' },
+  { id: 'friendly', name: '친근한' },
+  { id: 'creative', name: '창의적' },
+  { id: 'luxurious', name: '고급스러운' },
+  { id: 'bright', name: '밝은' },
+];
+
 // 이미지 생성 요청 타입
 export interface GenerateImageRequest {
   content: string;  // 블로그 본문 내용
   title: string;    // 블로그 제목
+  style?: ImageStyle;  // 이미지 스타일
+  mood?: ImageMood;  // 이미지 분위기
+  includeText?: boolean;  // 텍스트 포함 여부
+  textContent?: string;  // 포함할 텍스트 내용
+  additionalRequest?: string;  // 추가 요청사항
 }
 
 // 이미지 생성 응답 타입

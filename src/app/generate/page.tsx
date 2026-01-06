@@ -21,7 +21,17 @@ import {
   Textarea,
 } from '@/components/ui';
 import { AI_MODELS, DEFAULT_MODEL, type AIModelId } from '@/lib/ai-models';
-import { CONTENT_TYPES, type ContentType, type SourceData, type GenerateResponse, type GenerateImageResponse } from '@/types';
+import {
+  CONTENT_TYPES,
+  IMAGE_STYLES,
+  IMAGE_MOODS,
+  type ContentType,
+  type SourceData,
+  type GenerateResponse,
+  type GenerateImageResponse,
+  type ImageStyle,
+  type ImageMood
+} from '@/types';
 
 export default function GeneratePage() {
   const router = useRouter();
@@ -34,6 +44,13 @@ export default function GeneratePage() {
   const [copied, setCopied] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string>('');
   const [imageMimeType, setImageMimeType] = useState<string>('');
+
+  // 이미지 생성 옵션 상태
+  const [imageStyle, setImageStyle] = useState<ImageStyle>('realistic');
+  const [imageMood, setImageMood] = useState<ImageMood>('professional');
+  const [includeText, setIncludeText] = useState(false);
+  const [imageTextContent, setImageTextContent] = useState('');
+  const [imageAdditionalRequest, setImageAdditionalRequest] = useState('');
 
   // Fetch all source data for dropdown
   const { data: sourceDataList } = useQuery({
@@ -83,6 +100,11 @@ export default function GeneratePage() {
       const res = await axios.post<GenerateImageResponse>('/api/generate-image', {
         title: generateData.title,
         content: generatedContent,
+        style: imageStyle,
+        mood: imageMood,
+        includeText,
+        textContent: includeText ? imageTextContent : undefined,
+        additionalRequest: imageAdditionalRequest || undefined,
       });
       return res.data;
     },
@@ -328,6 +350,81 @@ export default function GeneratePage() {
                 {/* 이미지 생성 섹션 */}
                 <div className="mt-6 space-y-4 border-t pt-6">
                   <h3 className="text-lg font-semibold">이미지 생성</h3>
+
+                  {/* 이미지 생성 옵션 */}
+                  <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                    <h4 className="text-sm font-semibold text-gray-700">이미지 생성 옵션</h4>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* 이미지 스타일 */}
+                      <div className="space-y-2">
+                        <Label>이미지 스타일</Label>
+                        <Select value={imageStyle} onValueChange={(v) => setImageStyle(v as ImageStyle)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {IMAGE_STYLES.map((style) => (
+                              <SelectItem key={style.id} value={style.id}>
+                                {style.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* 분위기 */}
+                      <div className="space-y-2">
+                        <Label>분위기</Label>
+                        <Select value={imageMood} onValueChange={(v) => setImageMood(v as ImageMood)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {IMAGE_MOODS.map((mood) => (
+                              <SelectItem key={mood.id} value={mood.id}>
+                                {mood.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* 텍스트 포함 */}
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="includeText"
+                          checked={includeText}
+                          onChange={(e) => setIncludeText(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <Label htmlFor="includeText" className="cursor-pointer">이미지에 텍스트 포함</Label>
+                      </div>
+                      {includeText && (
+                        <input
+                          type="text"
+                          placeholder="이미지에 포함할 텍스트를 입력하세요"
+                          value={imageTextContent}
+                          onChange={(e) => setImageTextContent(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      )}
+                    </div>
+
+                    {/* 추가 요청사항 */}
+                    <div className="space-y-2">
+                      <Label>추가 요청사항 (선택)</Label>
+                      <Textarea
+                        placeholder="이미지 생성 시 추가로 원하는 사항을 입력하세요..."
+                        value={imageAdditionalRequest}
+                        onChange={(e) => setImageAdditionalRequest(e.target.value)}
+                        rows={2}
+                      />
+                    </div>
+                  </div>
 
                   {/* 이미지 생성 버튼 */}
                   <Button

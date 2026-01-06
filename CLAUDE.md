@@ -136,3 +136,64 @@ src/
 - **모든 작업은 서브에이전트 활용**: 직접 구현 대신 적절한 서브에이전트를 선택하여 작업
 - **기능별 전문 서브에이전트 활용**: UI는 `base-ui-component-architect`, 페이지는 `base-app-router-architect` 등
 - **완성도 높은 구현**: 서브에이전트가 전체 기능을 처음부터 끝까지 완성
+
+---
+
+## 작업 현황 (2026-01-06 기준)
+
+### 완료된 기능
+
+#### 1. AI 이미지 생성 기능
+- **Gemini Nano Banana 모델** (`gemini-2.5-flash-image`) 연동
+- 블로그 텍스트 생성 후 2차로 이미지 생성 가능
+- 관련 파일:
+  - `src/lib/gemini.ts` - Gemini 클라이언트
+  - `src/app/api/generate-image/route.ts` - 이미지 생성 API
+
+#### 2. 이미지 생성 옵션 (4가지)
+- **이미지 스타일**: 사실적, 일러스트, 미니멀, 3D, 수채화
+- **분위기**: 전문적, 친근한, 창의적, 고급스러운, 밝은
+- **텍스트 포함**: 체크 시 포함할 문구 입력
+- **추가 요청사항**: 자유 텍스트 입력
+- 관련 타입: `ImageStyle`, `ImageMood`, `IMAGE_STYLES`, `IMAGE_MOODS` (`src/types/post.ts`)
+
+#### 3. 이미지 Supabase Storage 저장
+- 포스트 저장 시 생성된 이미지를 Storage에 업로드
+- `image_url` 필드로 포스트와 연동
+- 포스트 상세 페이지에서 이미지 표시
+- 관련 파일:
+  - `src/app/api/posts/route.ts` - 이미지 업로드 로직 포함
+  - `src/app/posts/[id]/page.tsx` - 이미지 표시
+
+### 필수 환경 변수
+```env
+# .env.local에 추가 필요
+GOOGLE_AI_API_KEY=your-google-ai-api-key  # Google AI Studio에서 발급
+```
+
+### Supabase 설정 필요 사항
+
+#### 1. DB 컬럼 추가 (SQL Editor에서 실행)
+```sql
+ALTER TABLE generated_posts ADD COLUMN image_url TEXT;
+```
+
+#### 2. Storage 버킷 생성
+- 버킷 이름: `blog-images`
+- Public bucket: 활성화
+
+#### 3. Storage RLS 정책 추가 (SQL Editor에서 실행)
+```sql
+-- 업로드 허용
+CREATE POLICY "Allow public uploads" ON storage.objects
+FOR INSERT WITH CHECK (bucket_id = 'blog-images');
+
+-- 읽기 허용
+CREATE POLICY "Allow public reads" ON storage.objects
+FOR SELECT USING (bucket_id = 'blog-images');
+```
+
+### 다음 작업 시 확인 사항
+- [ ] Supabase Storage RLS 정책이 적용되었는지 확인
+- [ ] 이미지 생성 → 저장 → 상세 페이지 표시 플로우 테스트
+- [ ] GitHub 푸시 (`git push origin main`)
