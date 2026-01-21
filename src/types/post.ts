@@ -32,7 +32,8 @@ export interface GeneratedPost {
   created_at: string;
   updated_at: string;
   source_data?: SourceData;
-  image_url?: string;  // 생성된 이미지 URL (선택적)
+  image_url?: string;  // 생성된 메인 이미지 URL (선택적)
+  sub_image_urls?: string[];  // 서브 이미지 URL 배열 (선택적)
 }
 
 export interface GenerateRequest {
@@ -62,8 +63,12 @@ export interface PostCreateInput {
   prompt_used: string;
   model_used: string;
   tokens_used: number;
-  image_data?: string;      // base64 이미지 데이터
-  image_mime_type?: string; // 이미지 MIME 타입
+  image_data?: string;      // base64 메인 이미지 데이터
+  image_mime_type?: string; // 메인 이미지 MIME 타입
+  sub_images?: {            // 서브 이미지 배열
+    image_data: string;
+    mime_type: string;
+  }[];
 }
 
 export interface PostFilter {
@@ -104,6 +109,12 @@ export const IMAGE_MOODS: { id: ImageMood; name: string }[] = [
   { id: 'bright', name: '밝은' },
 ];
 
+// 참고 이미지 타입
+export interface ReferenceImage {
+  data: string;      // Base64 인코딩 데이터
+  mimeType: string;  // image/jpeg, image/png, image/webp 등
+}
+
 // 이미지 생성 요청 타입
 export interface GenerateImageRequest {
   content: string;  // 블로그 본문 내용
@@ -113,10 +124,61 @@ export interface GenerateImageRequest {
   includeText?: boolean;  // 텍스트 포함 여부
   textContent?: string;  // 포함할 텍스트 내용
   additionalRequest?: string;  // 추가 요청사항
+  referenceImage?: ReferenceImage;  // 참고 이미지 (선택)
 }
 
 // 이미지 생성 응답 타입
 export interface GenerateImageResponse {
   image_data: string;  // base64 인코딩된 이미지 데이터
   mime_type: string;   // 이미지 MIME 타입 (예: image/png)
+}
+
+// 이미지 용도 타입 (메인 + 서브 3개)
+export type ImagePurpose = 'main' | 'sub1' | 'sub2' | 'sub3';
+
+export const IMAGE_PURPOSES: { id: ImagePurpose; name: string }[] = [
+  { id: 'main', name: '메인 이미지' },
+  { id: 'sub1', name: '서브 이미지 1' },
+  { id: 'sub2', name: '서브 이미지 2' },
+  { id: 'sub3', name: '서브 이미지 3' },
+];
+
+// 개별 이미지 옵션
+export interface ImageOption {
+  purpose: ImagePurpose;
+  style: ImageStyle;
+  mood: ImageMood;
+  includeText: boolean;
+  textContent?: string;
+  additionalRequest?: string;
+  enabled: boolean;
+  referenceImage?: ReferenceImage;  // 참고 이미지 (선택)
+}
+
+// 생성된 이미지 데이터
+export interface GeneratedImageData {
+  purpose: ImagePurpose;
+  image_data: string;
+  mime_type: string;
+}
+
+// 다중 이미지 생성 요청 타입
+export interface GenerateMultipleImagesRequest {
+  content: string;
+  title: string;
+  referenceImage?: ReferenceImage;  // 전체 이미지에 적용할 참고 이미지 (선택)
+  images: {
+    purpose: ImagePurpose;
+    style?: ImageStyle;
+    mood?: ImageMood;
+    includeText?: boolean;
+    textContent?: string;
+    additionalRequest?: string;
+    referenceImage?: ReferenceImage;  // 개별 이미지용 참고 이미지 (선택)
+  }[];
+}
+
+// 다중 이미지 생성 응답 타입
+export interface GenerateMultipleImagesResponse {
+  images: GeneratedImageData[];
 }

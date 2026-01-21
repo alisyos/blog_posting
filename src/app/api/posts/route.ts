@@ -68,48 +68,65 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// 이미지 업로드 헬퍼 함수
+async function uploadImage(
+  imageData: string,
+  mimeType: string,
+  suffix: string
+): Promise<string | null> {
+  try {
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    const timestamp = Date.now();
+    const extension = getExtensionFromMimeType(mimeType);
+    const fileName = `${timestamp}-${suffix}.${extension}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('blog-images')
+      .upload(fileName, buffer, {
+        contentType: mimeType,
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error(`이미지 업로드 실패 (${suffix}):`, uploadError);
+      return null;
+    }
+
+    if (uploadData) {
+      const { data: urlData } = supabase.storage
+        .from('blog-images')
+        .getPublicUrl(uploadData.path);
+      return urlData.publicUrl;
+    }
+    return null;
+  } catch (error) {
+    console.error(`이미지 처리 중 오류 (${suffix}):`, error);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: PostCreateInput = await request.json();
 
     let imageUrl: string | null = null;
+    let subImageUrls: string[] = [];
 
-    // 이미지 데이터가 있으면 Supabase Storage에 업로드
+    // 메인 이미지 업로드
     if (body.image_data && body.image_mime_type) {
-      try {
-        // base64를 Buffer로 변환
-        const base64Data = body.image_data.replace(/^data:image\/\w+;base64,/, '');
-        const buffer = Buffer.from(base64Data, 'base64');
+      imageUrl = await uploadImage(body.image_data, body.image_mime_type, 'main');
+    }
 
-        // 파일명 생성 (타임스탬프 + 확장자)
-        const timestamp = Date.now();
-        const extension = getExtensionFromMimeType(body.image_mime_type);
-        const fileName = `${timestamp}.${extension}`;
-
-        // Supabase Storage에 업로드
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('blog-images')
-          .upload(fileName, buffer, {
-            contentType: body.image_mime_type,
-            cacheControl: '3600',
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error('이미지 업로드 실패:', uploadError);
-          // 이미지 업로드 실패해도 포스트는 저장 (이미지 없이)
-        } else if (uploadData) {
-          // Public URL 획득
-          const { data: urlData } = supabase.storage
-            .from('blog-images')
-            .getPublicUrl(uploadData.path);
-
-          imageUrl = urlData.publicUrl;
-        }
-      } catch (imageError) {
-        console.error('이미지 처리 중 오류:', imageError);
-        // 이미지 처리 실패해도 포스트는 저장 (이미지 없이)
-      }
+    // 서브 이미지들 업로드
+    if (body.sub_images && body.sub_images.length > 0) {
+      const uploadPromises = body.sub_images.map((subImg, index) =>
+        uploadImage(subImg.image_data, subImg.mime_type, `sub${index + 1}`)
+      );
+      const results = await Promise.all(uploadPromises);
+      subImageUrls = results.filter((url): url is string => url !== null);
     }
 
     const { data: post, error } = await supabase
@@ -126,19 +143,22 @@ export async function POST(request: NextRequest) {
           tokens_used: body.tokens_used,
           status: 'draft',
           image_url: imageUrl,
+          sub_image_urls: subImageUrls.length > 0 ? subImageUrls : null,
         },
       ])
       .select()
       .single();
 
     if (error) {
+      console.error('포스트 저장 실패:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json(post);
-  } catch (_error) {
+  } catch (err) {
+    console.error('포스트 저장 중 예외 발생:', err);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: err instanceof Error ? err.message : 'Internal server error' },
       { status: 500 }
     );
   }

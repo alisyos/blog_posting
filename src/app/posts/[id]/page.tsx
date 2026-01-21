@@ -115,12 +115,14 @@ export default function PostDetailPage({
           <CardContent>
             {post.image_url && (
               <div className="mb-6">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={post.image_url}
-                  alt={post.title}
-                  className="w-full max-w-2xl rounded-lg shadow-lg mx-auto"
-                />
+                <a href={post.image_url} target="_blank" rel="noopener noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={post.image_url}
+                    alt={post.title}
+                    className="w-full max-w-2xl rounded-lg shadow-lg mx-auto hover:opacity-90 transition-opacity cursor-pointer"
+                  />
+                </a>
               </div>
             )}
             <div
@@ -133,6 +135,31 @@ export default function PostDetailPage({
                   .replace(/\n/g, '<br />'),
               }}
             />
+
+            {/* 서브 이미지 갤러리 */}
+            {post.sub_image_urls && post.sub_image_urls.length > 0 && (
+              <div className="mt-8 pt-6 border-t">
+                <h3 className="text-lg font-semibold mb-4">추가 이미지</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  {post.sub_image_urls.map((url, index) => (
+                    <a
+                      key={index}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`서브 이미지 ${index + 1}`}
+                        className="w-full rounded-lg shadow-md hover:opacity-90 transition-opacity cursor-pointer aspect-square object-cover"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
