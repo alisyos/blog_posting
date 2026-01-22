@@ -37,6 +37,7 @@ import {
   type ImageOption,
   type ReferenceImage,
 } from '@/types';
+import { uploadImageToStorage } from '@/lib/supabase-storage';
 
 // 기본 이미지 옵션 생성
 const createDefaultImageOptions = (): ImageOption[] => [
@@ -217,6 +218,39 @@ export default function GeneratePage() {
       const mainImage = generatedImages.find(img => img.purpose === 'main');
       const subImages = generatedImages.filter(img => img.purpose !== 'main');
 
+      // 이미지를 먼저 Supabase Storage에 직접 업로드 (Vercel 요청 크기 제한 우회)
+      let mainImageUrl: string | undefined;
+      const subImageUrls: string[] = [];
+
+      if (mainImage) {
+        toast.info('메인 이미지 업로드 중...');
+        const url = await uploadImageToStorage(
+          mainImage.image_data,
+          mainImage.mime_type,
+          'main'
+        );
+        if (url) {
+          mainImageUrl = url;
+        } else {
+          throw new Error('메인 이미지 업로드에 실패했습니다.');
+        }
+      }
+
+      if (subImages.length > 0) {
+        toast.info('서브 이미지 업로드 중...');
+        for (const img of subImages) {
+          const url = await uploadImageToStorage(
+            img.image_data,
+            img.mime_type,
+            img.purpose
+          );
+          if (url) {
+            subImageUrls.push(url);
+          }
+        }
+      }
+
+      // URL만 전송 (요청 크기 대폭 감소)
       const res = await axios.post('/api/posts', {
         source_data_id: generateData.source_data_id,
         title,
@@ -226,12 +260,8 @@ export default function GeneratePage() {
         prompt_used: generateData.prompt_used,
         model_used: generateData.model_used,
         tokens_used: generateData.tokens_used,
-        image_data: mainImage?.image_data || undefined,
-        image_mime_type: mainImage?.mime_type || undefined,
-        sub_images: subImages.length > 0 ? subImages.map(img => ({
-          image_data: img.image_data,
-          mime_type: img.mime_type,
-        })) : undefined,
+        image_url: mainImageUrl,
+        sub_image_urls: subImageUrls.length > 0 ? subImageUrls : undefined,
       });
       return res.data;
     },

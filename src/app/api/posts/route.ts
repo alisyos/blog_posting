@@ -2,17 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import type { PostFilter, PostCreateInput } from '@/types';
 
-// MIME 타입에서 확장자 추출
-function getExtensionFromMimeType(mimeType: string): string {
-  const map: Record<string, string> = {
-    'image/png': 'png',
-    'image/jpeg': 'jpg',
-    'image/gif': 'gif',
-    'image/webp': 'webp',
-  };
-  return map[mimeType] || 'png';
-}
-
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -68,66 +57,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 이미지 업로드 헬퍼 함수
-async function uploadImage(
-  imageData: string,
-  mimeType: string,
-  suffix: string
-): Promise<string | null> {
-  try {
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-
-    const timestamp = Date.now();
-    const extension = getExtensionFromMimeType(mimeType);
-    const fileName = `${timestamp}-${suffix}.${extension}`;
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('blog-images')
-      .upload(fileName, buffer, {
-        contentType: mimeType,
-        cacheControl: '3600',
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error(`이미지 업로드 실패 (${suffix}):`, uploadError);
-      return null;
-    }
-
-    if (uploadData) {
-      const { data: urlData } = supabase.storage
-        .from('blog-images')
-        .getPublicUrl(uploadData.path);
-      return urlData.publicUrl;
-    }
-    return null;
-  } catch (error) {
-    console.error(`이미지 처리 중 오류 (${suffix}):`, error);
-    return null;
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body: PostCreateInput = await request.json();
 
-    let imageUrl: string | null = null;
-    let subImageUrls: string[] = [];
-
-    // 메인 이미지 업로드
-    if (body.image_data && body.image_mime_type) {
-      imageUrl = await uploadImage(body.image_data, body.image_mime_type, 'main');
-    }
-
-    // 서브 이미지들 업로드
-    if (body.sub_images && body.sub_images.length > 0) {
-      const uploadPromises = body.sub_images.map((subImg, index) =>
-        uploadImage(subImg.image_data, subImg.mime_type, `sub${index + 1}`)
-      );
-      const results = await Promise.all(uploadPromises);
-      subImageUrls = results.filter((url): url is string => url !== null);
-    }
+    // 클라이언트에서 이미 업로드된 이미지 URL을 직접 사용
+    // (Vercel 요청 크기 제한 4.5MB 우회)
+    const imageUrl = body.image_url || null;
+    const subImageUrls = body.sub_image_urls && body.sub_image_urls.length > 0
+      ? body.sub_image_urls
+      : null;
 
     const { data: post, error } = await supabase
       .from('generated_posts')
@@ -143,7 +82,7 @@ export async function POST(request: NextRequest) {
           tokens_used: body.tokens_used,
           status: 'draft',
           image_url: imageUrl,
-          sub_image_urls: subImageUrls.length > 0 ? subImageUrls : null,
+          sub_image_urls: subImageUrls,
         },
       ])
       .select()

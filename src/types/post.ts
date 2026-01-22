@@ -63,12 +63,9 @@ export interface PostCreateInput {
   prompt_used: string;
   model_used: string;
   tokens_used: number;
-  image_data?: string;      // base64 메인 이미지 데이터
-  image_mime_type?: string; // 메인 이미지 MIME 타입
-  sub_images?: {            // 서브 이미지 배열
-    image_data: string;
-    mime_type: string;
-  }[];
+  // URL 방식 (권장 - Vercel 요청 크기 제한 우회)
+  image_url?: string;        // 이미 업로드된 메인 이미지 URL
+  sub_image_urls?: string[]; // 이미 업로드된 서브 이미지 URL 배열
 }
 
 export interface PostFilter {
