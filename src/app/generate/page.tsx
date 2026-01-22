@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
@@ -67,6 +67,11 @@ export default function GeneratePage() {
   const [referenceImage, setReferenceImage] = useState<ReferenceImage | null>(null);
   const [referenceImagePreview, setReferenceImagePreview] = useState<string | null>(null);
 
+  // 필터링 상태
+  const [rangeInput, setRangeInput] = useState({ start: '', end: '' });
+  const [numberRange, setNumberRange] = useState<{ start: number | null; end: number | null }>({ start: null, end: null });
+  const [hideGeneratedSources, setHideGeneratedSources] = useState(false);
+
   // Fetch all source data for dropdown
   const { data: sourceDataList } = useQuery({
     queryKey: ['source-data-all'],
@@ -75,6 +80,66 @@ export default function GeneratePage() {
       return res.data.data as SourceData[];
     },
   });
+
+  // Fetch generated source IDs
+  const { data: generatedStatusData } = useQuery({
+    queryKey: ['generated-source-ids'],
+    queryFn: async () => {
+      const res = await axios.get('/api/source-data/generated-status');
+      return res.data as { generated_ids: string[]; count: number };
+    },
+  });
+
+  // 필터링 로직
+  const { filteredSourceData, stats } = useMemo(() => {
+    if (!sourceDataList) return { filteredSourceData: [], stats: { total: 0, generated: 0, notGenerated: 0 } };
+
+    const generatedIds = new Set(generatedStatusData?.generated_ids || []);
+
+    let filtered = sourceDataList;
+
+    // 번호 범위 필터
+    if (numberRange.start !== null || numberRange.end !== null) {
+      filtered = filtered.filter(item => {
+        const num = item.number;
+        if (numberRange.start !== null && num < numberRange.start) return false;
+        if (numberRange.end !== null && num > numberRange.end) return false;
+        return true;
+      });
+    }
+
+    // 생성 여부 필터
+    if (hideGeneratedSources) {
+      filtered = filtered.filter(item => !generatedIds.has(item.id));
+    }
+
+    // 통계 계산
+    const generated = sourceDataList.filter(item => generatedIds.has(item.id)).length;
+
+    return {
+      filteredSourceData: filtered,
+      stats: {
+        total: sourceDataList.length,
+        generated,
+        notGenerated: sourceDataList.length - generated,
+      },
+    };
+  }, [sourceDataList, generatedStatusData, numberRange, hideGeneratedSources]);
+
+  // 필터 적용 함수
+  const handleApplyRange = useCallback(() => {
+    const start = rangeInput.start ? parseInt(rangeInput.start) : null;
+    const end = rangeInput.end ? parseInt(rangeInput.end) : null;
+    setNumberRange({ start, end });
+  }, [rangeInput]);
+
+  // 필터 초기화 함수
+  const handleResetFilters = useCallback(() => {
+    setRangeInput({ start: '', end: '' });
+    setNumberRange({ start: null, end: null });
+    setHideGeneratedSources(false);
+    setSelectedNumber('');
+  }, []);
 
   // Get selected source data
   const selectedSourceData = sourceDataList?.find(
@@ -314,16 +379,75 @@ export default function GeneratePage() {
               <CardTitle>1. 소스 데이터 선택</CardTitle>
             </CardHeader>
             <CardContent>
+              {/* 필터링 옵션 */}
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg space-y-4">
+                <h4 className="text-sm font-semibold text-gray-700">필터링 옵션</h4>
+
+                {/* 번호 범위 필터 */}
+                <div className="space-y-2">
+                  <Label className="text-sm">번호 범위</Label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="number"
+                      placeholder="시작"
+                      value={rangeInput.start}
+                      onChange={(e) => setRangeInput(prev => ({ ...prev, start: e.target.value }))}
+                      className="w-24 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      min="1"
+                    />
+                    <span className="text-gray-500">~</span>
+                    <input
+                      type="number"
+                      placeholder="끝"
+                      value={rangeInput.end}
+                      onChange={(e) => setRangeInput(prev => ({ ...prev, end: e.target.value }))}
+                      className="w-24 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      min="1"
+                    />
+                    <Button variant="outline" size="sm" onClick={handleApplyRange}>
+                      적용
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleResetFilters}>
+                      초기화
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 생성 여부 필터 */}
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hideGeneratedSources}
+                      onChange={(e) => setHideGeneratedSources(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm">미생성 소스만 표시</span>
+                  </label>
+                  <span className="text-xs text-gray-500">
+                    미생성: {stats.notGenerated}개 / 전체: {stats.total}개
+                  </span>
+                </div>
+              </div>
+
               <Select value={selectedNumber} onValueChange={setSelectedNumber}>
                 <SelectTrigger>
-                  <SelectValue placeholder="번호를 선택하세요" />
+                  <SelectValue placeholder={`번호를 선택하세요 (${filteredSourceData.length}개)`} />
                 </SelectTrigger>
                 <SelectContent>
-                  {sourceDataList?.map((item) => (
-                    <SelectItem key={item.id} value={item.number.toString()}>
-                      {item.number}. {item.blog_topic}
-                    </SelectItem>
-                  ))}
+                  {filteredSourceData.map((item) => {
+                    const isGenerated = generatedStatusData?.generated_ids?.includes(item.id);
+                    return (
+                      <SelectItem
+                        key={item.id}
+                        value={item.number.toString()}
+                        className={isGenerated ? 'text-gray-400' : ''}
+                      >
+                        {item.number}. {item.blog_topic}
+                        {isGenerated && <span className="ml-2 text-xs text-gray-400">(생성됨)</span>}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
 
