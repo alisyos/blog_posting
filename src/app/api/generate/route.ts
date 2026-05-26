@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     let generatedContent: string;
     let tokensUsed: number;
 
-    const systemPrompt = '당신은 전문 블로그 콘텐츠 작가입니다. 주어진 정보를 바탕으로 SEO에 최적화된 고품질 블로그 글을 작성합니다.';
+    const systemPrompt = '당신은 전문 블로그 콘텐츠 작가입니다. 주어진 정보를 바탕으로 SEO에 최적화된 고품질 블로그 글을 작성합니다. 반드시 사용자가 제공한 정보와 일반 상식 범위 안에서만 작성하며, 검증되지 않은 구체적 사실(전문가 협업, 연구 결과, 수상 내역, 통계 수치 등)을 임의로 만들어내서는 안 됩니다.';
 
     if (isGpt5Model(selectedModel)) {
       // GPT-5 계열: Responses API 사용
